@@ -2,11 +2,21 @@ import numpy as np
 
 # Helper functions
 def compute_mse(e):
+    """Half mean squared error: (1/2N) * sum(e^2)."""
     return 1 / 2 * np.mean(e**2)
 
-def compute_loss(y, tx, w):
+def mse_loss(y, tx, w):
+    """MSE loss for linear regression (least squares / ridge)."""
     e = y - tx.dot(w)
     return compute_mse(e)
+
+def sigmoid(t):
+    return 1.0 / (1.0 + np.exp(-t))
+
+def logistic_loss(y, tx, w):
+    """Binary cross-entropy / negative log-likelihood for logistic regression."""
+    pred = sigmoid(tx.dot(w))
+    return np.mean(-y * np.log(pred) - (1.0 - y) * np.log(1.0 - pred))
 
 # Main 6 graded functions
 
