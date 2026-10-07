@@ -9,28 +9,28 @@ Example of a json-config file:
 {
   "name": "stack_baseline",
   "seed": 42,
-  "preprocess": {
-    "steps": [
-      {"step": "drop_columns",
-       "columns": ["IDATE", "IMONTH", "IDAY", "IYEAR", "FMONTH", "SEQNO",
-                   "_PSU", "DISPCODE", "_STSTR", "_STRWT", "_RAWRAKE",
-                   "_WT2RAKE", "_LLCPWT"]},
-      {"step": "map_special_codes"},
-      {"step": "drop_nan_cols", "threshold": 0.8},
-      {"step": "impute", "numeric": "median", "categorical": "mode"},
-      {"step": "one_hot", "max_categories": 10},
-      {"step": "standardize"}
-    ]
+
+  "preprocess": [
+    {"step": "drop_columns", "columns": ["IDATE", "IMONTH", "IDAY", "IYEAR", "FMONTH",
+                                         "SEQNO", "_PSU", "DISPCODE", "_STSTR", "_STRWT",
+                                         "_RAWRAKE", "_WT2RAKE", "_LLCPWT"]},
+    {"step": "fill_missing_values", "numeric": "median", "categorical": "mode"},
+    {"step": "one_hot", "max_categories": 10},
+    {"step": "standardize"}
+  ],
+
+  "models": {
+    "logreg_light": {"name": "reg_logistic_regression", "lambda_": 0.001, "gamma": 0.1, "max_iters": 2000},
+    "logreg_heavy": {"name": "reg_logistic_regression", "lambda_": 0.1,   "gamma": 0.1, "max_iters": 2000},
+    "ridge":        {"name": "ridge_regression",        "lambda_": 0.01},
+    "meta":         {"name": "logistic_regression",     "gamma": 0.1,     "max_iters": 500}
   },
-  "model": {
-    "type": "stack",
-    "base": [
-      {"name": "reg_logistic_regression", "lambda_": 0.001, "gamma": 0.1, "max_iters": 2000},
-      {"name": "reg_logistic_regression", "lambda_": 0.1, "gamma": 0.1, "max_iters": 2000},
-      {"name": "ridge_regression", "lambda_": 0.01}
-    ],
-    "meta": {"name": "logistic_regression", "gamma": 0.1, "max_iters": 500}
-  },
+
+  "stack": [
+    ["logreg_light", "logreg_heavy", "ridge"],
+    ["meta"]
+  ],
+
   "eval": {
     "cv": {"folds": 5, "stratified": true, "shuffle": true},
     "metrics": ["f1", "accuracy", "precision", "recall"],
@@ -59,6 +59,9 @@ class ConfigReader:
 
     def return_model_config(self):
         return self.config.get("model", {})
+
+    def return_model_stack(self):
+        return self.config.get("stack", [])
 
     def return_eval_config(self):
         return self.config.get("eval", {})
