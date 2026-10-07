@@ -1,1 +1,4 @@
-data/
+# Here we list documents or folders we DON'T want in our public repository
+# For example pycache
+
+# Example: data/
