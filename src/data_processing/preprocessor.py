@@ -1,5 +1,56 @@
 import numpy as np
 
+
+# TODO: Preprocessor (factory) functions
+# Helpers:
+#   - run(config)                    call steps from config in order, record history
+#   - get_data()                     return x_train, x_test, names
+#   - summary()                      shape + NaNs left
+#   - save_history(path)
+#   - describe_column(name)          unique values, NaN rate, min/max
+#   - plot_missing(), plot_histogram(name), plot_correlation()
+#
+# More advanced:
+#   Column selection:
+#     - keep_columns(columns)
+#     - drop_constant_cols(max_frac)
+#     - drop_correlated_cols(threshold)
+#   Rows (train only):
+#     - drop_nan_rows(threshold)
+#     - drop_duplicate_rows()
+#     - drop_outlier_rows(z)
+#   Cleaning:
+#     - replace_values(column, mapping)
+#     - decode_units(columns)        ALCDAY5, fruit/veg, WEIGHT2, HEIGHT3, exercise
+#     - fix_decimals(columns)        e.g. _BMI5 / 100
+#   Missing values:
+#     - add_missing_indicators(min_rate)
+#     - impute_knn(k)                slow in pure numpy
+#   Encoding:
+#     - ordinal_encode(columns)
+#     - frequency_encode(columns)
+#     - target_encode(columns)       (per fold)
+#     - bin_numeric(column, bins)
+#   Transforms / scaling:
+#     - clip_outliers(lower, upper)
+#     - log_transform(columns)
+#     - min_max_scale()
+#     - robust_scale()
+#   Feature engineering:
+#     - polynomial_features(degree)
+#     - interaction_features(pairs)
+#     - custom_features()            e.g. BMI from weight and height
+#     - pca(n_components)
+#     - add_bias()
+#   Feature selection (per fold):
+#     - select_by_target_corr(k)
+#     - select_by_mutual_info(k)
+#   Class imbalance (per fold, train only):
+#     - undersample(ratio)
+#     - oversample(ratio)
+#   Labels:
+#     - labels_to_01(), labels_to_pm1()
+
 class Preprocessor:
     
     """
