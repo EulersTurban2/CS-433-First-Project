@@ -43,7 +43,18 @@ def ridge_regression(y, tx, lambda_):
     return w, loss
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
-    pass
+    w = np.asarray(initial_w, dtype=float).copy()
+    for _ in range(max_iters):
+        grad = tx.T.dot(sigmoid(tx.dot(w)) - y) / y.shape[0]
+        w = w - gamma * grad
+    loss = logistic_loss(y, tx, w)
+    return w, loss
 
 def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
-    pass
+    # Loss must not include the penalty term!!
+    w = np.asarray(initial_w, dtype=float).copy()
+    for _ in range(max_iters):
+        grad = tx.T.dot(sigmoid(tx.dot(w)) - y) / y.shape[0] + 2 * lambda_ * w
+        w = w - gamma * grad
+    loss = logistic_loss(y, tx, w)
+    return w, loss
