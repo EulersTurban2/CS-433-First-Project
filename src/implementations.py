@@ -10,6 +10,12 @@ def mse_loss(y, tx, w):
     e = y - tx.dot(w)
     return compute_mse(e)
 
+def compute_gradient(y, tx, w):
+    """Computes the gradient at w."""
+    e = y - np.dot(tx, w)
+    gradient = -1 / y.shape[0] * np.dot(tx.T, e)
+    return gradient
+
 def sigmoid(t):
     return 1.0 / (1.0 + np.exp(-t))
 
@@ -21,10 +27,22 @@ def logistic_loss(y, tx, w):
 # Main 6 graded functions
 
 def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
-    pass
-
+    """Gradient descent algorithm for linear regression (least squares / ridge)."""
+    w = initial_w
+    for _ in range(max_iters):
+        gradient = compute_gradient(y, tx, w)
+        w = w - gamma * gradient
+    loss = mse_loss(y, tx, w)
+    return w, loss
+    
 def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
-    pass
+    """Stochastic gradient descent algorithm for linear regression (least squares / ridge)."""
+    w = initial_w
+    for _ in range(max_iters):
+        i = np.random.choice(y.shape[0])
+        w = w - gamma * compute_gradient(y[i:i+1], tx[i:i+1], w)
+    loss = mse_loss(y, tx, w)
+    return w, loss
 
 def least_squares(y, tx):
     a = tx.T.dot(tx)
