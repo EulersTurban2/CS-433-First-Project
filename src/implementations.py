@@ -1,5 +1,24 @@
-# Required file for our 6 graded functions implementations
+import numpy as np
 
+# Helper functions
+def compute_mse(e):
+    """Half mean squared error: (1/2N) * sum(e^2)."""
+    return 1 / 2 * np.mean(e**2)
+
+def mse_loss(y, tx, w):
+    """MSE loss for linear regression (least squares / ridge)."""
+    e = y - tx.dot(w)
+    return compute_mse(e)
+
+def sigmoid(t):
+    return 1.0 / (1.0 + np.exp(-t))
+
+def logistic_loss(y, tx, w):
+    """Binary cross-entropy / negative log-likelihood for logistic regression."""
+    pred = sigmoid(tx.dot(w))
+    return np.mean(-y * np.log(pred) - (1.0 - y) * np.log(1.0 - pred))
+
+# Main 6 graded functions
 
 def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
     pass
@@ -8,13 +27,34 @@ def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
     pass
 
 def least_squares(y, tx):
-    pass
+    a = tx.T.dot(tx)
+    b = tx.T.dot(y)
+    w = np.linalg.solve(a, b)
+    loss = mse_loss(y, tx, w)
+    return w, loss
 
 def ridge_regression(y, tx, lambda_):
-    pass
+    aI = 2 * tx.shape[0] * lambda_ * np.identity(tx.shape[1])
+    a = tx.T.dot(tx) + aI
+    b = tx.T.dot(y)
+    w = np.linalg.solve(a, b)
+    # Loss must not include the penalty term!!
+    loss = mse_loss(y, tx, w)
+    return w, loss
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
-    pass
+    w = np.asarray(initial_w, dtype=float).copy()
+    for _ in range(max_iters):
+        grad = tx.T.dot(sigmoid(tx.dot(w)) - y) / y.shape[0]
+        w = w - gamma * grad
+    loss = logistic_loss(y, tx, w)
+    return w, loss
 
 def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
-    pass
+    # Loss must not include the penalty term!!
+    w = np.asarray(initial_w, dtype=float).copy()
+    for _ in range(max_iters):
+        grad = tx.T.dot(sigmoid(tx.dot(w)) - y) / y.shape[0] + 2 * lambda_ * w
+        w = w - gamma * grad
+    loss = logistic_loss(y, tx, w)
+    return w, loss
