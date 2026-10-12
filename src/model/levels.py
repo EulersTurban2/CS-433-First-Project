@@ -7,7 +7,7 @@ from src.folds import stratified_folds
 from src.metrics import auroc
 
 class Level:
-    def __init__(self, level_name, models, passthrough = False, seed = 42, folds = 2):
+    def __init__(self, level_name, models, passthrough = False, seed = 42, folds = 5):
         self.level_name = level_name
         self.models = models
         self.passthrough = passthrough
@@ -28,7 +28,7 @@ class Level:
             X_val, y_val = X_train[val_idx], y_train[val_idx]
 
             for i, name in enumerate(names):
-                model = self.models[name]
+                model = copy.deepcopy(self.models[name])
                 model.fit(X_tr, y_tr, X_val, y_val)
                 oof[val_idx, i] = model.predict(X_val)
 
@@ -42,7 +42,7 @@ class Level:
             raise ValueError("Level has not been fitted yet. Call fit_transform first.")
         if X_orig is None:
             X_orig = X
-        preds = np.column_stack([model.predict(X) for model in self.fitted_models])
+        preds = np.column_stack([model.predict(X) for model in self.fitted_models.values()])
         return self._assemble(preds, X_orig)
 
     def _assemble(self, preds, X_orig):
