@@ -159,6 +159,10 @@ class Preprocessor:
         self.x_ids_train[:, feature] = np.vectorize(mapping_func)(self.x_ids_train[:, feature])
         self.x_ids_test[:, feature] = np.vectorize(mapping_func)(self.x_ids_test[:, feature])
 
+
+    def labels_to_01(self):
+        self.y_train = np.where(self.y_train > 0, 1, 0)
+
     """
     Getters for processed data, training data, and test data.
 
