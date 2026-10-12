@@ -2,7 +2,6 @@ import copy
 import numpy as np
 import model.model as model
 
-
 from src.folds import stratified_folds
 from src.metrics import auroc
 
