@@ -1,5 +1,7 @@
 import json
 
+import src.data_processing.preprocessor as preprocessor
+
 """
 To fasten up experiment execution, we read from a json file, which contains all the parameters for the experiment.
 It is possible to change the parameters in the json file, and the experiment will be executed with the new parameters!
@@ -40,7 +42,7 @@ Example of a json-config file:
 }
 """
 
-class ConfigReader:
+class ConfigBuilder:
     def __init__(self, config_file):
         with open(config_file, 'r') as f:
             self.config = json.load(f)
@@ -49,7 +51,7 @@ class ConfigReader:
         return self.config.get(key, default)
 
     def preprocess_config(self):
-        return self.config.get("preprocess", {}).get("steps", [])
+        return self.config.get("preprocess", {})
 
     def return_seed(self):
         return self.config.get("seed", 42)
@@ -66,4 +68,23 @@ class ConfigReader:
     def return_eval_config(self):
         return self.config.get("eval", {})
 
-        
+
+class ConfigRunner:
+    def __init__(self, config_builder:ConfigBuilder):
+        self.config_builder = config_builder
+
+    def run_data_preprocess(self, X_train, X_test, y_train, train_ids, test_ids, feature_names):
+        preprocess_steps = self.config_builder.preprocess_config()
+        preprocessor_instance = preprocessor.Preprocessor(X_train, y_train, X_test, train_ids, test_ids, feature_names)
+
+        for step in preprocess_steps:
+            fn_name = step.get("step")
+            args = {k: v for k, v in step.items() if k != "step"}
+            preprocessor_instance.run(fn_name, **args)
+
+        return preprocessor_instance.get_processed_data(), preprocessor_instance
+
+
+
+    
+

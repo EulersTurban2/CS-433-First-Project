@@ -3,11 +3,10 @@
   "seed": 42,
 
   "preprocess": [
-    {"step": "drop_columns", "columns": ["IDATE", "IMONTH", "IDAY", "IYEAR", "FMONTH",
+    {"step": "drop_features", "features_to_drop": ["IDATE", "IMONTH", "IDAY", "IYEAR", "FMONTH",
                                          "SEQNO", "_PSU", "DISPCODE", "_STSTR", "_STRWT",
                                          "_RAWRAKE", "_WT2RAKE", "_LLCPWT"]},
-    {"step": "fill_missing_values", "numeric": "median", "categorical": "mode"},
-    {"step": "one_hot", "max_categories": 10},
+    {"step": "fill_missing_values", "strategy" : "mean"},
     {"step": "standardize"}
   ],
 

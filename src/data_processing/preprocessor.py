@@ -3,7 +3,6 @@ import numpy as np
 
 # TODO: Preprocessor (factory) functions
 # Helpers:
-#   - run(config)                    call steps from config in order, record history
 #   - get_data()                     return x_train, x_test, names
 #   - summary()                      shape + NaNs left
 #   - save_history(path)
@@ -12,7 +11,6 @@ import numpy as np
 #
 # More advanced:
 #   Column selection:
-#     - keep_columns(columns)
 #     - drop_constant_cols(max_frac)
 #     - drop_correlated_cols(threshold)
 #   Rows (train only):
@@ -68,27 +66,42 @@ class Preprocessor:
             10. map_func: Map values in a specified feature to new values based on a provided mapping function.
     """
     
-    def __init__(self, x_train, y_train, x_test, train_ids, test_ids):
-        self.x_train = x_train
-        self.y_train = y_train
-        self.x_test = x_test
+    def __init__(self, x_train, y_train, x_test, train_ids, test_ids, feature_names):
+        self.x_train = x_train.astype(float, copy=True)
+        self.y_train = np.asarray(y_train).copy()
+        self.x_test = x_test.astype(float, copy=True)
         self.train_ids = train_ids
         self.test_ids = test_ids
-
+        self.feature_names = feature_names
+        
         self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
         self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
 
-    def drop_features(self, features_to_drop):
-        self.x_ids_train = np.delete(self.x_ids_train, features_to_drop, axis=1)
-        self.x_ids_test = np.delete(self.x_ids_test, features_to_drop, axis=1)
+    def keep_columns(self, keep):
+        dropped = [n for n, k in zip(self.feature_names, keep) if not k]
+        self.x_train = self.x_train[:, keep]
+        self.x_test = self.x_test[:, keep]
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
+        self.feature_names = [n for n, k in zip(self.feature_names, keep)]
+        return dropped
 
+    #TESTED, WORKING FINALLY
+    def drop_features(self, features_to_drop):
+        missing = [f for f in features_to_drop if f not in self.feature_names]
+        if missing:
+            print(f"drop_features: not found, skipped {missing}")
+        drop = set(features_to_drop)
+        keep = np.array([n not in drop for n in self.feature_names], dtype=bool)
+        return self.keep_columns(keep)
+
+    #TESTED
     def standardize(self):
         mean = np.mean(self.x_ids_train[:, 1:], axis=0)  # Exclude the ID column
         std = np.std(self.x_ids_train[:, 1:], axis=0)
         self.x_train = (self.x_train - mean) / std 
         self.x_test = (self.x_test - mean) / std
-
         self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
         self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
@@ -108,6 +121,7 @@ class Preprocessor:
             self.x_ids_train = np.hstack((self.x_ids_train, one_hot_train))
             self.x_ids_test = np.hstack((self.x_ids_test, one_hot_test))
 
+    #TESTED
     def fill_missing_values(self, strategy='mean'):
         if strategy == 'mean':
             mean = np.nanmean(self.x_train, axis=0)
@@ -126,9 +140,12 @@ class Preprocessor:
         else:
             raise ValueError("Strategy not recognized. Use 'mean' or 'median'.")
 
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
+
     def drop_duplicates(self):
-        self.x_train = np.unique(self.x_train, axis=0)
-        self.x_test = np.unique(self.x_test, axis=0)
+        self.x_ids_test = np.unique(self.x_ids_test, axis=0)
+        self.x_ids_train = np.unique(self.x_ids_train, axis=0)
 
     def remove_outliers(self, z_threshold):
         mean = np.mean(self.x_train, axis=0)
@@ -183,6 +200,15 @@ class Preprocessor:
         self.test_ids = self.x_ids_test[:, 0].astype(int)
         return self.x_test, self.test_ids
 
+
+    # Runner
+
+    def run(self, name, *args, **kwargs):
+        if hasattr(self, name):
+            method = getattr(self, name)
+            return method(*args, **kwargs)
+        else:
+            raise ValueError(f"Method {name} not found in Preprocessor class!")
 
 
 
