@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 # TODO: Preprocessor (factory) functions
@@ -205,13 +206,29 @@ class Preprocessor:
 
 
     # Runner
-
     def run(self, name, *args, **kwargs):
         if hasattr(self, name):
             method = getattr(self, name)
             return method(*args, **kwargs)
         else:
             raise ValueError(f"Method {name} not found in Preprocessor class!")
+
+
+    # Save result
+    def export(self, path):
+        os.makedirs(path, exist_ok=True)
+        header = ",".join(["Id"] + self.feature_names)
+        files = {
+            "x_train.csv": (np.column_stack([self.train_ids, self.x_train]), header, "%.10g"),
+            "x_test.csv": (np.column_stack([self.test_ids, self.x_test]), header, "%.10g"),
+            "y_train.csv": (np.column_stack([self.train_ids, self.y_train]), "Id,_MICHD", "%d"),
+        }
+        paths = []
+        for filename, (table, head, f) in files.items():
+            new_path = os.path.join(path, filename)
+            np.savetxt(new_path, table, delimiter=",", header=head, comments="", fmt=f)
+            paths.append(new_path)
+        return paths
 
 
 
