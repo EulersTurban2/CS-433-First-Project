@@ -1,0 +1,88 @@
+{
+  "name": "preprocess_pipeline",
+  "seed": 42,
+
+  "preprocess": [
+    {"step": "drop_features", "features_to_drop": [
+      "IDATE", "IMONTH", "IDAY", "IYEAR", "FMONTH", "SEQNO", "_PSU", "DISPCODE", "QSTVER", "QSTLANG", "_STATE",
+      "_STSTR", "_STRWT", "_RAWRAKE", "_WT2RAKE", "_LLCPWT", "_CLLCPWT", "_DUALUSE", "_DUALCOR", "_CHISPNC", "_CRACE1", "_CPRACE",
+      "CTELENUM", "PVTRESD1", "COLGHOUS", "STATERES", "CELLFON3", "LADULT", "CTELNUM1", "CELLFON2", "CADULT", "PVTRESD2", "CCLGHOUS", "CSTATE", "LANDLINE", "HHADULT", "_VEG23", "_FRT16",
+      "WEIGHT2", "HEIGHT3", "ALCDAY5", "FRUITJU1", "FRUIT1", "FVBEANS", "FVGREEN", "FVORANG", "VEGETAB1", "EXEROFT1", "EXERHMM1", "EXEROFT2", "EXERHMM2", "STRENGTH",
+      "_AGE65YR", "_AGE_G", "_PRACE1", "_MRACE1", "_HISPANC", "_RACEG21", "_RACEGR3", "_RACE_G1"]},
+
+    {"step": "map_special_codes", "groups": [
+      {"columns": ["GENHLTH", "HLTHPLN1", "PERSDOC2", "MEDCOST", "CHECKUP1",
+                   "BPHIGH4", "BPMEDS", "BLOODCHO", "CHOLCHK", "TOLDHI2",
+                   "CVDSTRK3", "ASTHMA3", "ASTHNOW", "CHCSCNCR", "CHCOCNCR",
+                   "CHCCOPD1", "HAVARTH3", "ADDEPEV2", "CHCKIDNY", "DIABETE3",
+                   "RENTHOM1", "NUMHHOL2", "CPDEMO1", "VETERAN3", "INTERNET",
+                   "QLACTLM2", "USEEQUIP", "BLIND", "DECIDE", "DIFFWALK",
+                   "DIFFDRES", "DIFFALON", "SMOKE100", "SMOKDAY2", "STOPSMK2",
+                   "USENOW3", "EXERANY2", "LMTJOIN3", "ARTHDIS2", "ARTHSOCL",
+                   "SEATBELT", "FLUSHOT6", "PNEUVAC3", "HIVTST6", "DRNKANY5"],
+       "map": {"7": null, "9": null}},
+
+      {"columns": ["MARITAL", "EDUCA", "EMPLOY1"],
+       "map": {"9": null}},
+
+      {"columns": ["INCOME2"],
+       "map": {"77": null, "99": null}},
+
+      {"columns": ["PHYSHLTH", "MENTHLTH", "POORHLTH", "DRNK3GE5"],
+       "map": {"77": null, "99": null, "88": 0}},
+
+      {"columns": ["AVEDRNK2", "MAXDRNKS"],
+       "map": {"77": null, "99": null}},
+
+      {"columns": ["CHILDREN"],
+       "map": {"99": null, "88": 0}},
+
+      {"columns": ["_AGEG5YR"],
+       "map": {"14": null}},
+
+      {"columns": ["_RFHLTH", "_HCVU651", "_RFHYPE5", "_CHOLCHK", "_RFCHOL",
+                   "_LTASTH1", "_CASTHM1", "_ASTHMS1", "_RACE", "_EDUCAG",
+                   "_INCOMG", "_RFBMI5", "_SMOKER3", "_RFSMOK3", "_RFBING5",
+                   "_RFDRHV5", "_TOTINDA", "_PACAT1", "_PAINDX1", "_PA150R2",
+                   "_PA300R2", "_PA30021", "_PASTRNG", "_PAREC1", "_PASTAE1",
+                   "_LMTACT1", "_LMTWRK1", "_LMTSCL1", "_RFSEAT2", "_RFSEAT3",
+                   "_FLSHOT6", "_PNEUMO2", "_AIDTST3"],
+       "map": {"9": null}},
+
+      {"columns": ["WTKG3"],    "map": {"99999": null}},
+      {"columns": ["DROCDY3_"], "map": {"900": null}},
+      {"columns": ["_DRNKWEK"], "map": {"99900": null}}
+    ]},
+
+    {"step": "drop_nan", "threshold": 0.5},
+
+    {"step": "one_hot_encode", "categorical_features": [
+      "MARITAL", "EMPLOY1", "RENTHOM1", "_RACE", "MSCODE",
+      "BPHIGH4", "DIABETE3", "CHECKUP1", "_SMOKER3", "_ASTHMS1"]},
+
+    {"step": "fill_missing_values", "strategy": "median"},
+
+    {"step": "standardize"},
+
+    {"step": "labels_to_01"}
+  ],
+
+  "models": {
+    "logreg_light": {"name": "reg_logistic_regression", "lambda_": 0.001, "gamma": 0.1, "max_iters": 2000},
+    "logreg_heavy": {"name": "reg_logistic_regression", "lambda_": 0.1,   "gamma": 0.1, "max_iters": 2000},
+    "ridge":        {"name": "ridge_regression",        "lambda_": 0.01},
+    "meta":         {"name": "logistic_regression",     "gamma": 0.1,     "max_iters": 500}
+  },
+
+  "stack": [
+    ["logreg_light", "logreg_heavy", "ridge"],
+    ["meta"]
+  ],
+
+  "eval": {
+    "cv": {"folds": 5, "stratified": true, "shuffle": true},
+    "metrics": ["f1", "accuracy", "precision", "recall"],
+    "threshold_search": {"optimize": "f1", "min": 0.05, "max": 0.95, "step": 0.01},
+    "save": ["oof_predictions", "history", "submission"]
+  }
+}

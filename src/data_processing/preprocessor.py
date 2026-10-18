@@ -205,13 +205,23 @@ class Preprocessor:
         self.train_ids = self.train_ids[rows_to_keep]
         self.y_train = self.y_train[rows_to_keep]
 
-    # TESTED
+    # TESTED (times 2)
     def map_dict(self, feature, mapping_dict):
-        mapping = {
-            float(k): (np.nan if v is None else float(v))
-            for k, v in mapping_dict.items()
-        }
-        self.map_func(feature, lambda v: mapping.get(v, v))
+        mapping, has_nan, nan_value = {}, False, None
+        for k, v in mapping_dict.items():
+            new = np.nan if v is None else float(v)
+            if str(k).lower() == "nan":
+                has_nan, nan_value = True, new
+            else:
+                mapping[float(k)] = new
+
+        def lookup(v):
+            if np.isnan(v):
+                return nan_value if has_nan else v
+            return mapping.get(v, v)
+
+        self.map_func(feature, lookup)
+        return mapping
 
     # TESTED
     def map_func(self, feature, mapping_func):
@@ -219,13 +229,18 @@ class Preprocessor:
         f = np.vectorize(mapping_func, otypes=[float])
         self.x_train[:, j] = f(self.x_train[:, j])
         self.x_test[:, j] = f(self.x_test[:, j])
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
-        )
-        self.x_ids_test = np.concatenate(
-            (self.test_ids.reshape(-1, 1), self.x_test), axis=1
-        )
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
+    def map_special_codes(self, groups):
+        for group in groups:
+            for f in group["columns"]:
+                if f not in self.feature_names:
+                    print(f"map_special_codes: '{f}' not found, skipped")
+                    continue
+                self.map_dict(f, group["map"])
+
+    
     def labels_to_01(self):
         self.y_train = np.where(self.y_train > 0, 1, 0)
 
