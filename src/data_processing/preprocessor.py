@@ -1,31 +1,18 @@
+import os
 import numpy as np
-
 
 # TODO: Preprocessor (factory) functions
 # Helpers:
-#   - run(config)                    call steps from config in order, record history
-#   - get_data()                     return x_train, x_test, names
-#   - summary()                      shape + NaNs left
 #   - save_history(path)
-#   - describe_column(name)          unique values, NaN rate, min/max
 #   - plot_missing(), plot_histogram(name), plot_correlation()
 #
 # More advanced:
 #   Column selection:
-#     - keep_columns(columns)
-#     - drop_constant_cols(max_frac)
 #     - drop_correlated_cols(threshold)
 #   Rows (train only):
 #     - drop_nan_rows(threshold)
 #     - drop_duplicate_rows()
 #     - drop_outlier_rows(z)
-#   Cleaning:
-#     - replace_values(column, mapping)
-#     - decode_units(columns)        ALCDAY5, fruit/veg, WEIGHT2, HEIGHT3, exercise
-#     - fix_decimals(columns)        e.g. _BMI5 / 100
-#   Missing values:
-#     - add_missing_indicators(min_rate)
-#     - impute_knn(k)                slow in pure numpy
 #   Encoding:
 #     - ordinal_encode(columns)
 #     - frequency_encode(columns)
@@ -36,20 +23,6 @@ import numpy as np
 #     - log_transform(columns)
 #     - min_max_scale()
 #     - robust_scale()
-#   Feature engineering:
-#     - polynomial_features(degree)
-#     - interaction_features(pairs)
-#     - custom_features()            e.g. BMI from weight and height
-#     - pca(n_components)
-#     - add_bias()
-#   Feature selection (per fold):
-#     - select_by_target_corr(k)
-#     - select_by_mutual_info(k)
-#   Class imbalance (per fold, train only):
-#     - undersample(ratio)
-#     - oversample(ratio)
-#   Labels:
-#     - labels_to_01(), labels_to_pm1()
 
 class Preprocessor:
     
@@ -68,46 +41,77 @@ class Preprocessor:
             10. map_func: Map values in a specified feature to new values based on a provided mapping function.
     """
     
-    def __init__(self, x_train, y_train, x_test, train_ids, test_ids):
-        self.x_train = x_train
-        self.y_train = y_train
-        self.x_test = x_test
-        self.train_ids = train_ids
-        self.test_ids = test_ids
-
+    def __init__(self, x_train, y_train, x_test, train_ids, test_ids, feature_names):
+        self.x_train = x_train.astype(float, copy=True)
+        self.y_train = np.asarray(y_train).copy()
+        self.x_test = x_test.astype(float, copy=True)
+        self.train_ids = np.asarray(train_ids).copy()
+        self.test_ids = np.asarray(test_ids).copy()
+        self.feature_names = list(feature_names)
+        
         self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
         self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
 
-    def drop_features(self, features_to_drop):
-        self.x_ids_train = np.delete(self.x_ids_train, features_to_drop, axis=1)
-        self.x_ids_test = np.delete(self.x_ids_test, features_to_drop, axis=1)
+    def keep_columns(self, keep):
+        dropped = [n for n, k in zip(self.feature_names, keep) if not k]
+        self.x_train = self.x_train[:, keep]
+        self.x_test = self.x_test[:, keep]
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
+        self.feature_names = [n for n, k in zip(self.feature_names, keep) if k]
+        return dropped
 
+    def keep_train_rows(self, keep):
+        removed = self.train_ids[~keep].tolist()
+        self.x_train = self.x_train[keep]
+        self.y_train = self.y_train[keep]
+        self.train_ids = self.train_ids[keep]
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        return removed
+
+    #TESTED, WORKING FINALLY
+    def drop_features(self, features_to_drop):
+        missing = [f for f in features_to_drop if f not in self.feature_names]
+        if missing:
+            print(f"drop_features: not found, skipped {missing}")
+        drop = set(features_to_drop)
+        keep = np.array([n not in drop for n in self.feature_names], dtype=bool)
+        return self.keep_columns(keep)
+
+    #TESTED
     def standardize(self):
-        mean = np.mean(self.x_ids_train[:, 1:], axis=0)  # Exclude the ID column
-        std = np.std(self.x_ids_train[:, 1:], axis=0)
+        mean = np.nanmean(self.x_ids_train[:, 1:], axis=0)
+        std = np.nanstd(self.x_ids_train[:, 1:], axis=0)
+        no_values = np.isnan(mean)
+        mean[no_values] = 0.0
+        std[no_values | (std == 0)] = 1.0
         self.x_train = (self.x_train - mean) / std 
         self.x_test = (self.x_test - mean) / std
-
         self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
         self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
+
+    #TESTED
     def one_hot_encode(self, categorical_features):
+        categories = {}
         for feature in categorical_features:
-            unique_values = np.unique(self.x_ids_train[:, feature])
-            one_hot_train = np.zeros((self.x_ids_train.shape[0], len(unique_values)))
-            one_hot_test = np.zeros((self.x_ids_test.shape[0], len(unique_values)))
+            position = self.feature_names.index(feature)
+            col = self.x_train[:, position]
+            cats = np.unique(col[~np.isnan(col)])
 
-            for i, value in enumerate(unique_values):
-                one_hot_train[:, i] = (self.x_ids_train[:, feature] == value).astype(int)
-                one_hot_test[:, i] = (self.x_ids_test[:, feature] == value).astype(int)
+            new_train = (self.x_train[:, [position]] == cats).astype(float)
+            new_test = (self.x_test[:, [position]] == cats).astype(float)
+            self.x_train = np.hstack([np.delete(self.x_train, position, axis=1), new_train])
+            self.x_test = np.hstack([np.delete(self.x_test, position, axis=1), new_test])
+            self.feature_names = [n for n in self.feature_names if n != feature] + [f"{feature}={c:g}" for c in cats]
+            categories[feature] = cats.tolist()
 
-            self.x_ids_train = np.delete(self.x_ids_train, feature, axis=1)
-            self.x_ids_test = np.delete(self.x_ids_test, feature, axis=1)
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
+        return categories
 
-            self.x_ids_train = np.hstack((self.x_ids_train, one_hot_train))
-            self.x_ids_test = np.hstack((self.x_ids_test, one_hot_test))
-
+    #TESTED
     def fill_missing_values(self, strategy='mean'):
         if strategy == 'mean':
             mean = np.nanmean(self.x_train, axis=0)
@@ -126,38 +130,59 @@ class Preprocessor:
         else:
             raise ValueError("Strategy not recognized. Use 'mean' or 'median'.")
 
-    def drop_duplicates(self):
-        self.x_train = np.unique(self.x_train, axis=0)
-        self.x_test = np.unique(self.x_test, axis=0)
-
-    def remove_outliers(self, z_threshold):
-        mean = np.mean(self.x_train, axis=0)
-        std = np.std(self.x_train, axis=0)
-        z_scores = np.abs((self.x_train - mean) / std)
-        self.x_train = self.x_train[(z_scores < z_threshold).all(axis=1)]
-        self.y_train = self.y_train[(z_scores < z_threshold).all(axis=1)]
-
-        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
         self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
+    # TESTED
+    def drop_duplicates(self):
+        filled = np.where(np.isnan(self.x_train), np.inf, self.x_train)  
+        _, first = np.unique(filled, axis=0, return_index=True)
+        keep = np.zeros(len(self.x_train), dtype=bool)
+        keep[first] = True
+        return self.keep_train_rows(keep)
+
+    # TESTED
+    def remove_outliers(self, z_threshold):
+        mean = np.nanmean(self.x_train, axis=0)
+        std = np.nanstd(self.x_train, axis=0)
+        
+        valid_values = ~np.isnan(std) & (std > 0)
+        
+        z_scores = np.abs((self.x_train[:, valid_values] - mean[valid_values]) / std[valid_values])
+        outlier = (z_scores >= z_threshold).any(axis=1)
+        return self.keep_train_rows(~outlier)
+
+    # TESTED
     def drop_nan(self, threshold):
         nan_percentage = np.isnan(self.x_train).mean(axis=0)
-        features_to_drop = np.where(nan_percentage > threshold)[0]
-        self.drop_features(features_to_drop)
+        features_to_drop = nan_percentage <= threshold
+        self.keep_columns(features_to_drop)
 
+    # TESTED
     def drop_nan_rows(self, threshold):
         nan_percentage = np.isnan(self.x_ids_train[:, 1:]).mean(axis=1)  # Exclude the ID column
         rows_to_keep = np.where(nan_percentage <= threshold)[0]
         self.x_ids_train = self.x_ids_train[rows_to_keep]
+        self.x_train = self.x_ids_train[:, 1:]
+        self.train_ids = self.train_ids[rows_to_keep]
         self.y_train = self.y_train[rows_to_keep]
 
+    # TESTED
     def map_dict(self, feature, mapping_dict):
-        self.x_ids_train[:, feature] = np.vectorize(mapping_dict.get)(self.x_ids_train[:, feature])
-        self.x_ids_test[:, feature] = np.vectorize(mapping_dict.get)(self.x_ids_test[:, feature])
+        mapping = {float(k): (np.nan if v is None else float(v)) for k, v in mapping_dict.items()}
+        self.map_func(feature, lambda v: mapping.get(v, v))
 
+    # TESTED
     def map_func(self, feature, mapping_func):
-        self.x_ids_train[:, feature] = np.vectorize(mapping_func)(self.x_ids_train[:, feature])
-        self.x_ids_test[:, feature] = np.vectorize(mapping_func)(self.x_ids_test[:, feature])
+        j = self.feature_names.index(feature)
+        f = np.vectorize(mapping_func, otypes=[float])
+        self.x_train[:, j] = f(self.x_train[:, j])
+        self.x_test[:, j] = f(self.x_test[:, j])
+        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
+    
+    def labels_to_01(self):
+        self.y_train = np.where(self.y_train > 0, 1, 0)
 
     """
     Getters for processed data, training data, and test data.
@@ -179,6 +204,31 @@ class Preprocessor:
         self.test_ids = self.x_ids_test[:, 0].astype(int)
         return self.x_test, self.test_ids
 
+
+    # Runner
+    def run(self, name, *args, **kwargs):
+        if hasattr(self, name):
+            method = getattr(self, name)
+            return method(*args, **kwargs)
+        else:
+            raise ValueError(f"Method {name} not found in Preprocessor class!")
+
+
+    # Save result
+    def export(self, path):
+        os.makedirs(path, exist_ok=True)
+        header = ",".join(["Id"] + self.feature_names)
+        files = {
+            "x_train.csv": (np.column_stack([self.train_ids, self.x_train]), header, "%.10g"),
+            "x_test.csv": (np.column_stack([self.test_ids, self.x_test]), header, "%.10g"),
+            "y_train.csv": (np.column_stack([self.train_ids, self.y_train]), "Id,_MICHD", "%d"),
+        }
+        paths = []
+        for filename, (table, head, f) in files.items():
+            new_path = os.path.join(path, filename)
+            np.savetxt(new_path, table, delimiter=",", header=head, comments="", fmt=f)
+            paths.append(new_path)
+        return paths
 
 
 

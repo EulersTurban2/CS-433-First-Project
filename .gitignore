@@ -1,3 +1,6 @@
 # Here we list documents or folders we DON'T want in our public repository
 # For example pycache
 /data/
+/src/data_processing/__pycache__/
+/src/models/__pycache__/
+/src/__pycache__/
