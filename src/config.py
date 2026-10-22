@@ -42,9 +42,10 @@ Example of a json-config file:
 }
 """
 
+
 class ConfigBuilder:
     def __init__(self, config_file):
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             self.config = json.load(f)
 
     def get(self, key, default=None):
@@ -70,12 +71,16 @@ class ConfigBuilder:
 
 
 class ConfigRunner:
-    def __init__(self, config_builder:ConfigBuilder):
+    def __init__(self, config_builder: ConfigBuilder):
         self.config_builder = config_builder
 
-    def run_data_preprocess(self, X_train, X_test, y_train, train_ids, test_ids, feature_names):
+    def run_data_preprocess(
+        self, X_train, X_test, y_train, train_ids, test_ids, feature_names
+    ):
         preprocess_steps = self.config_builder.preprocess_config()
-        preprocessor_instance = preprocessor.Preprocessor(X_train, y_train, X_test, train_ids, test_ids, feature_names)
+        preprocessor_instance = preprocessor.Preprocessor(
+            X_train, y_train, X_test, train_ids, test_ids, feature_names
+        )
 
         for step in preprocess_steps:
             fn_name = step.get("step")
@@ -83,8 +88,3 @@ class ConfigRunner:
             preprocessor_instance.run(fn_name, **args)
 
         return preprocessor_instance.get_processed_data(), preprocessor_instance
-
-
-
-    
-

@@ -48,10 +48,12 @@ def load_csv_data(data_path, sub_sample=False):
 
     return x_train, x_test, y_train, train_ids, test_ids
 
+
 def load_feature_names(data_path):
     def header(filename):
-        with open(os.path.join(data_path,filename)) as f:
+        with open(os.path.join(data_path, filename)) as f:
             return f.readline().strip().split(",")[1:]
+
     names = header("x_train.csv")
     if header("x_test.csv") != names:
         raise ValueError("Different column names in x_train and x_test!")
