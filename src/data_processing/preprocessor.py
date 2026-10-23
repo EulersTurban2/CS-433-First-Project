@@ -187,6 +187,13 @@ class Preprocessor:
         features_to_drop = nan_percentage <= threshold
         self.keep_columns(features_to_drop)
 
+    def drop_constant(self):
+        keep = []
+        for j in range(self.x_train.shape[1]):
+            observed = self.x_train[np.isfinite(self.x_train[:, j]), j]
+            keep.append(len(np.unique(observed)) > 1)
+        self.keep_columns(np.asarray(keep, dtype=bool))
+
     # TESTED
     def drop_nan_rows(self, threshold):
         nan_percentage = np.isnan(self.x_ids_train[:, 1:]).mean(
