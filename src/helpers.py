@@ -5,6 +5,31 @@ import numpy as np
 import os
 
 
+def _read_feature_csv(path, max_rows=None):
+    """Read a numeric CSV into a float array. Blank cells become NaN."""
+    with open(path, newline="") as handle:
+        n_cols = handle.readline().count(",") + 1
+        n_rows = sum(1 for line in handle if line.strip())
+    if max_rows is not None:
+        n_rows = min(n_rows, max_rows)
+    data = np.empty((n_rows, n_cols), dtype=np.float64)
+    with open(path, newline="") as handle:
+        reader = csv.reader(handle)
+        next(reader)
+        row_index = 0
+        for row in reader:
+            if not row:
+                continue
+            if len(row) != n_cols:
+                raise ValueError(f"{path} row {row_index} has {len(row)} fields, expected {n_cols}")
+            for j, cell in enumerate(row):
+                data[row_index, j] = np.nan if cell == "" else float(cell)
+            row_index += 1
+            if row_index == n_rows:
+                break
+    return data
+
+
 def load_csv_data(data_path, sub_sample=False):
     """
     This function loads the data and returns the respectinve numpy arrays.
@@ -28,12 +53,8 @@ def load_csv_data(data_path, sub_sample=False):
         dtype=int,
         usecols=1,
     )
-    x_train = np.genfromtxt(
-        os.path.join(data_path, "x_train.csv"), delimiter=",", skip_header=1
-    )
-    x_test = np.genfromtxt(
-        os.path.join(data_path, "x_test.csv"), delimiter=",", skip_header=1
-    )
+    x_train = _read_feature_csv(os.path.join(data_path, "x_train.csv"))
+    x_test = _read_feature_csv(os.path.join(data_path, "x_test.csv"))
 
     train_ids = x_train[:, 0].astype(dtype=int)
     test_ids = x_test[:, 0].astype(dtype=int)
@@ -48,10 +69,12 @@ def load_csv_data(data_path, sub_sample=False):
 
     return x_train, x_test, y_train, train_ids, test_ids
 
+
 def load_feature_names(data_path):
     def header(filename):
-        with open(os.path.join(data_path,filename)) as f:
+        with open(os.path.join(data_path, filename)) as f:
             return f.readline().strip().split(",")[1:]
+
     names = header("x_train.csv")
     if header("x_test.csv") != names:
         raise ValueError("Different column names in x_train and x_test!")

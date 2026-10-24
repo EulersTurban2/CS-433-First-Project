@@ -4,12 +4,14 @@ import numpy as np
     Metric functions for evaluating classification models.
 """
 
+
 def precision(y_true, y_pred):
     tp = np.sum((y_true == 1) & (y_pred == 1))
     fp = np.sum((y_true != 1) & (y_pred == 1))
     if tp + fp == 0:
         return 0.0
     return tp / (tp + fp)
+
 
 def recall(y_true, y_pred):
     tp = np.sum((y_true == 1) & (y_pred == 1))
@@ -18,10 +20,15 @@ def recall(y_true, y_pred):
         return 0.0
     return tp / (tp + fn)
 
+
 def f1_score(y_true, y_pred):
     precision_value = precision(y_true, y_pred)
     recall_value = recall(y_true, y_pred)
-    return 2 * (precision_value * recall_value) / (precision_value + recall_value) if (precision_value + recall_value) > 0 else 0.0
+    return (
+        2 * (precision_value * recall_value) / (precision_value + recall_value)
+        if (precision_value + recall_value) > 0
+        else 0.0
+    )
 
 
 def accuracy(y_true, y_pred):
@@ -47,5 +54,5 @@ def auroc(y_true, y_scores):
     ranks = np.arange(1, len(y_true_sorted) + 1)
     sum_ranks_pos = np.sum(ranks[y_true_sorted == 1])
 
-    auc = (sum_ranks_pos - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg) 
+    auc = (sum_ranks_pos - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
     return auc if auc > 0 else np.nan

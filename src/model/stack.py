@@ -1,10 +1,11 @@
 import copy
 import numpy as np
 
+
 class Stack:
     def __init__(self, levels, final_model):
-        self.levels = levels            #A list of Level instances
-        self.final_model = final_model  #A Model instance
+        self.levels = levels  # A list of Level instances
+        self.final_model = final_model  # A Model instance
         self.fitted_final = None
 
     def fit(self, X_train, y_train, X_val, y_val):
