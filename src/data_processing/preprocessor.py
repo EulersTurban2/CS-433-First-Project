@@ -40,6 +40,10 @@ class Preprocessor:
         8. drop_nan_rows(threshold): Drop rows with a percentage of NaN values above the specified threshold.
         9. map_dict: Map values in a specified feature to new values based on a provided mapping dictionary.
         10. map_func: Map values in a specified feature to new values based on a provided mapping function.
+        11. copy / fold(tr, va): A new Preprocessor on the same data, or on one CV fold (validation rows as test set).
+        12. clean(drop_above): Basic cleaning: drop_nan, drop_constant, median fill, standardize.
+        13. add_bias: Add a column of ones (the intercept) in front of the features.
+        14. undersample(ratio, seed): Keep all positive training rows and ratio times as many negatives.
     """
 
     def __init__(self, x_train, y_train, x_test, train_ids, test_ids, feature_names):
@@ -50,23 +54,40 @@ class Preprocessor:
         self.test_ids = np.asarray(test_ids).copy()
         self.feature_names = list(feature_names)
 
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
+    # ids + data are only glued together when someone asks for them,
+    # rebuilding them after every step copied the whole matrix each time
+    @property
+    def x_ids_train(self):
+        return np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
+
+    @property
+    def x_ids_test(self):
+        return np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
+
+    def copy(self):
+        return Preprocessor(
+            self.x_train,
+            self.y_train,
+            self.x_test,
+            self.train_ids,
+            self.test_ids,
+            self.feature_names,
         )
-        self.x_ids_test = np.concatenate(
-            (self.test_ids.reshape(-1, 1), self.x_test), axis=1
+
+    def fold(self, tr, va):
+        return Preprocessor(
+            self.x_train[tr],
+            self.y_train[tr],
+            self.x_train[va],
+            self.train_ids[tr],
+            self.train_ids[va],
+            self.feature_names,
         )
 
     def keep_columns(self, keep):
         dropped = [n for n, k in zip(self.feature_names, keep) if not k]
         self.x_train = self.x_train[:, keep]
         self.x_test = self.x_test[:, keep]
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
-        )
-        self.x_ids_test = np.concatenate(
-            (self.test_ids.reshape(-1, 1), self.x_test), axis=1
-        )
         self.feature_names = [n for n, k in zip(self.feature_names, keep) if k]
         return dropped
 
@@ -75,9 +96,6 @@ class Preprocessor:
         self.x_train = self.x_train[keep]
         self.y_train = self.y_train[keep]
         self.train_ids = self.train_ids[keep]
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
-        )
         return removed
 
     # TESTED, WORKING FINALLY
@@ -91,74 +109,47 @@ class Preprocessor:
 
     # TESTED
     def standardize(self):
-        mean = np.nanmean(self.x_ids_train[:, 1:], axis=0)
-        std = np.nanstd(self.x_ids_train[:, 1:], axis=0)
+        mean = np.nanmean(self.x_train, axis=0)
+        std = np.nanstd(self.x_train, axis=0)
         no_values = np.isnan(mean)
         mean[no_values] = 0.0
         std[no_values | (std == 0)] = 1.0
-        self.x_train = (self.x_train - mean) / std
-        self.x_test = (self.x_test - mean) / std
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
-        )
-        self.x_ids_test = np.concatenate(
-            (self.test_ids.reshape(-1, 1), self.x_test), axis=1
-        )
+        self.x_train -= mean
+        self.x_train /= std
+        self.x_test -= mean
+        self.x_test /= std
 
     # TESTED
     def one_hot_encode(self, categorical_features):
         categories = {}
-        for feature in categorical_features:
-            position = self.feature_names.index(feature)
+        positions = [self.feature_names.index(f) for f in categorical_features]
+        new_train, new_test, new_names = [], [], []
+        for feature, position in zip(categorical_features, positions):
             col = self.x_train[:, position]
             cats = np.unique(col[~np.isnan(col)])
 
-            new_train = (self.x_train[:, [position]] == cats).astype(float)
-            new_test = (self.x_test[:, [position]] == cats).astype(float)
-            self.x_train = np.hstack(
-                [np.delete(self.x_train, position, axis=1), new_train]
-            )
-            self.x_test = np.hstack(
-                [np.delete(self.x_test, position, axis=1), new_test]
-            )
-            self.feature_names = [n for n in self.feature_names if n != feature] + [
-                f"{feature}={c:g}" for c in cats
-            ]
+            new_train.append((self.x_train[:, [position]] == cats).astype(float))
+            new_test.append((self.x_test[:, [position]] == cats).astype(float))
+            new_names += [f"{feature}={c:g}" for c in cats]
             categories[feature] = cats.tolist()
 
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
-        )
-        self.x_ids_test = np.concatenate(
-            (self.test_ids.reshape(-1, 1), self.x_test), axis=1
-        )
+        self.x_train = np.hstack([np.delete(self.x_train, positions, axis=1)] + new_train)
+        self.x_test = np.hstack([np.delete(self.x_test, positions, axis=1)] + new_test)
+        encoded = set(categorical_features)
+        self.feature_names = [n for n in self.feature_names if n not in encoded] + new_names
         return categories
 
     # TESTED
     def fill_missing_values(self, strategy="mean"):
         if strategy == "mean":
-            mean = np.nanmean(self.x_train, axis=0)
-            inds_train = np.where(np.isnan(self.x_train))
-            self.x_train[inds_train] = np.take(mean, inds_train[1])
-
-            inds_test = np.where(np.isnan(self.x_test))
-            self.x_test[inds_test] = np.take(mean, inds_test[1])
+            fill = np.nanmean(self.x_train, axis=0)
         elif strategy == "median":
-            median = np.nanmedian(self.x_train, axis=0)
-            inds_train = np.where(np.isnan(self.x_train))
-            self.x_train[inds_train] = np.take(median, inds_train[1])
-
-            inds_test = np.where(np.isnan(self.x_test))
-            self.x_test[inds_test] = np.take(median, inds_test[1])
+            fill = np.nanmedian(self.x_train, axis=0)
         else:
             raise ValueError("Strategy not recognized. Use 'mean' or 'median'.")
 
-        self.x_ids_train = np.concatenate(
-            (self.train_ids.reshape(-1, 1), self.x_train), axis=1
-        )
-        self.x_ids_test = np.concatenate(
-            (self.test_ids.reshape(-1, 1), self.x_test), axis=1
-        )
+        self.x_train = np.where(np.isnan(self.x_train), fill, self.x_train)
+        self.x_test = np.where(np.isnan(self.x_test), fill, self.x_test)
 
     # TESTED
     def drop_duplicates(self):
@@ -188,22 +179,15 @@ class Preprocessor:
         self.keep_columns(features_to_drop)
 
     def drop_constant(self):
-        keep = []
-        for j in range(self.x_train.shape[1]):
-            observed = self.x_train[np.isfinite(self.x_train[:, j]), j]
-            keep.append(len(np.unique(observed)) > 1)
-        self.keep_columns(np.asarray(keep, dtype=bool))
+        observed = np.isfinite(self.x_train)
+        lowest = np.where(observed, self.x_train, np.inf).min(axis=0)
+        highest = np.where(observed, self.x_train, -np.inf).max(axis=0)
+        self.keep_columns(lowest < highest)
 
     # TESTED
     def drop_nan_rows(self, threshold):
-        nan_percentage = np.isnan(self.x_ids_train[:, 1:]).mean(
-            axis=1
-        )  # Exclude the ID column
-        rows_to_keep = np.where(nan_percentage <= threshold)[0]
-        self.x_ids_train = self.x_ids_train[rows_to_keep]
-        self.x_train = self.x_ids_train[:, 1:]
-        self.train_ids = self.train_ids[rows_to_keep]
-        self.y_train = self.y_train[rows_to_keep]
+        nan_percentage = np.isnan(self.x_train).mean(axis=1)
+        return self.keep_train_rows(nan_percentage <= threshold)
 
     # TESTED (times 2)
     def map_dict(self, feature, mapping_dict):
@@ -215,12 +199,14 @@ class Preprocessor:
             else:
                 mapping[float(k)] = new
 
-        def lookup(v):
-            if np.isnan(v):
-                return nan_value if has_nan else v
-            return mapping.get(v, v)
-
-        self.map_func(feature, lookup)
+        # masks come from the old column, so 1 -> 2 and 2 -> 1 doesn't chain
+        j = self.feature_names.index(feature)
+        for x in (self.x_train, self.x_test):
+            old = x[:, j].copy()
+            for k, v in mapping.items():
+                x[old == k, j] = v
+            if has_nan:
+                x[np.isnan(old), j] = nan_value
         return mapping
 
     # TESTED
@@ -229,8 +215,6 @@ class Preprocessor:
         f = np.vectorize(mapping_func, otypes=[float])
         self.x_train[:, j] = f(self.x_train[:, j])
         self.x_test[:, j] = f(self.x_test[:, j])
-        self.x_ids_train = np.concatenate((self.train_ids.reshape(-1, 1), self.x_train), axis=1)
-        self.x_ids_test = np.concatenate((self.test_ids.reshape(-1, 1), self.x_test), axis=1)
 
     def map_special_codes(self, groups):
         for group in groups:
@@ -240,28 +224,51 @@ class Preprocessor:
                     continue
                 self.map_dict(f, group["map"])
 
-    
+    def clean(self, drop_above=0.90):
+        self.drop_nan(drop_above)
+        self.drop_constant()
+        self.fill_missing_values("median")
+        self.standardize()
+        return self.x_train, self.x_test, self.feature_names
+
+    def add_bias(self):
+        self.x_train = np.column_stack([np.ones(len(self.x_train)), self.x_train])
+        self.x_test = np.column_stack([np.ones(len(self.x_test)), self.x_test])
+        self.feature_names = ["bias"] + self.feature_names
+
+    def undersample(self, ratio, seed):
+        rng = np.random.default_rng(seed)
+        pos = np.flatnonzero(self.y_train == 1)
+        neg = np.flatnonzero(self.y_train != 1)
+        take = min(len(neg), int(round(ratio * len(pos))))
+        chosen = np.concatenate([pos, rng.choice(neg, take, replace=False)])
+        rng.shuffle(chosen)
+        self.x_train = self.x_train[chosen]
+        self.y_train = self.y_train[chosen]
+        self.train_ids = self.train_ids[chosen]
+
+
     def labels_to_01(self):
         self.y_train = np.where(self.y_train > 0, 1, 0)
 
     """
     Getters for processed data, training data, and test data.
 
-    The following methods return the processed training and test datasets, along with the training labels and 
+    The following methods return the processed training and test datasets, along with the training labels and
 
     """
 
     def get_processed_data(self):
-        self.train_ids = self.x_ids_train[:, 0].astype(int)
-        self.test_ids = self.x_ids_test[:, 0].astype(int)
+        self.train_ids = self.train_ids.astype(int)
+        self.test_ids = self.test_ids.astype(int)
         return self.x_train, self.x_test, self.y_train, self.train_ids, self.test_ids
 
     def get_train_data(self):
-        self.train_ids = self.x_ids_train[:, 0].astype(int)
+        self.train_ids = self.train_ids.astype(int)
         return self.x_train, self.y_train, self.train_ids
 
     def get_test_data(self):
-        self.test_ids = self.x_ids_test[:, 0].astype(int)
+        self.test_ids = self.test_ids.astype(int)
         return self.x_test, self.test_ids
 
     # Runner
