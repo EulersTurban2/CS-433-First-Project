@@ -1,0 +1,38 @@
+% Section 3. Assumes IEEEtran + booktabs.
+
+% \section{Models, Evaluation \& Results}
+% \label{sec:models}
+
+We run the six required methods under stratified 5-fold CV (seed~42).
+Median fill, missing indicators, one-hot encoding and standardization are
+fit on each fold's training rows only.
+Labels are $\approx 8.9\%$ positive, so F1 uses a cutoff chosen on that fold's
+validation scores (defaults: score~$\ge 0$, probability~$\ge 0.5$).
+Ridge $\lambda\in\{10^{-4},10^{-3},10^{-2},10^{-1}\}$;
+reg.\ logistic $\lambda\in\{10^{-4},10^{-3},10^{-2}\}$;
+MSE-GD: $300$ steps, $\gamma{=}0.05$; logistic: $500$ steps, $\gamma{=}0.5$;
+SGD: $10^{5}$ updates, $\gamma{=}0.01$.
+
+Least squares, ridge ($\lambda{=}10^{-3}$) and MSE-GD are tied
+(F1~$0.422$/$0.422$/$0.421$).
+Logistic is best among the six (F1~$0.430\pm 0.004$; AUROC~$0.86$);
+$\ell_2$ does not help further.
+SGD yielded non-finite scores on every fold.
+For submission we used logistic refit on all data, with cutoff~$0.196$.
+
+\begin{table}[h!]
+  \centering
+  \caption{5-fold means (F1 with tuned cutoff).}
+  \label{tab:models}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{lcccc}
+    \toprule
+    Model & F1 & Prec. & Rec. & Acc. \\
+    \midrule
+    Least squares / ridge $10^{-3}$ & $0.422$ & $0.346$ & $0.539$ & $0.869$ \\
+    MSE GD & $0.421$ & $0.339$ & $0.557$ & $0.865$ \\
+    Logistic & $\mathbf{0.430}$ & $0.352$ & $0.556$ & $0.870$ \\
+    Reg.\ logistic $10^{-3}$ & $0.430$ & $0.354$ & $0.549$ & $0.871$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
