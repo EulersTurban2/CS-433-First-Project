@@ -1,0 +1,10 @@
+The BRFSS 2015 dataset contains 328,135 training and 109,379 test observations, each originally represented with 321 features. The target variable, \texttt{\_MICHD}, reveals whether a respondent reported having coronary heart disease or a myocardial infraction. Only $8.83\%$ of the training set belongs to the positive class, indicating a substantial class imbalance. Exploratory analysis further revealed that the proportion of positive cases varies across demographic and health-related factors.Figure~\ref{fig:prevalence} highlights this trend, showing that positive cases are more common among older respondents and those reporting poorer general health.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{eda_michd_prevalence.png}
+    \caption{Proportion of positive cases across age groups and general health categories}
+    \label{fig:prevalence}
+\end{figure}
+
+Preprocessing involved removing administrative features and recoding special survey responses, treating unknown answers as missing and zero-day responses as zero. Features with more than $90\%$ missing values and constant features were removed. Remaining missing values were imputed using the median, followed by standardization. All transformations were fitted on training folds to prevent data leakage.

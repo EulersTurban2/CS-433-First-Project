@@ -1,0 +1,49 @@
+\documentclass{llncs}
+\usepackage{graphicx} % Required for inserting images
+\usepackage[english]{babel}
+\usepackage[a4paper, hmargin=3.2cm, vmargin=4cm]{geometry}
+
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[hidelinks]{hyperref}
+\usepackage{booktabs}
+
+
+\title{ML First Project Report}
+\date{October 2026}
+
+\begin{document}
+
+\title{ML First Project: Report}
+
+\author{Anastasija Stojanović \and
+Andrea Arsenijević \and
+Gordan Đurić}
+
+\authorrunning{A.~Stojanović, A.~Arsenijević, G.~Đurić}
+
+\institute{École Polytechnique Fédérale de Lausanne (EPFL) \\
+\email{\{anastasija.stojanovic, andrea.arsenijevic, gordan.duric\}@epfl.ch}}
+
+\maketitle
+
+\section{Introduction}
+\input{intro.tex}
+
+\section{The Data - Description \& Cleaning pipeline}
+\input{data.tex}
+
+\section{Models, Evaluation \& Results}
+\input{models.tex}
+
+\section{Ablations}
+\input{ablations.tex}
+
+\section{Final remarks}
+\input{final.tex}
+
+\bibliographystyle{IEEEtran}
+\bibliography{literature}
+
+\end{document}
